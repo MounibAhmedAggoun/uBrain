@@ -187,7 +187,7 @@ export const useRoadmapStore = create<RoadmapStore>((set, get) => ({
   ...initialState,
   hydrate: async () => {
     const parsed = await loadRoadmapData()
-    if (isStoredRoadmaps(parsed)) set({ roadmaps: parsed.roadmaps.map(normalizeRoadmap), activeRoadmapId: parsed.activeRoadmapId ?? parsed.roadmaps[0].id })
+        if (isStoredRoadmaps(parsed)) set({ roadmaps: parsed.roadmaps.map(normalizeRoadmap), activeRoadmapId: parsed.activeRoadmapId ?? parsed.roadmaps[0].id, versions: parsed.versions ?? [] })
   },
   addNode: (position = { x: 260, y: 260 }) => {
     const nodeId = id('node')

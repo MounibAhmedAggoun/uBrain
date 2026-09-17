@@ -1,4 +1,4 @@
-import type { Roadmap } from '../store/useRoadmapStore'
+import type { Roadmap, RoadmapVersion } from '../store/useRoadmapStore'
 
 const edgeKinds = new Set(['required', 'optional', 'related', 'alternative'])
 const nodeColors = new Set(['mint', 'sky', 'amber', 'rose', 'lavender'])
@@ -23,4 +23,9 @@ export const isRoadmap = (value: unknown): value is Roadmap => {
   return value.edges.every((edge) => isRecord(edge) && typeof edge.id === 'string' && typeof edge.source === 'string' && typeof edge.target === 'string' && (edge.data === undefined || !isRecord(edge.data) || edge.data.kind === undefined || edgeKinds.has(String(edge.data.kind))))
 }
 
-export const isStoredRoadmaps = (value: unknown): value is { roadmaps: Roadmap[]; activeRoadmapId?: string } => isRecord(value) && Array.isArray(value.roadmaps) && value.roadmaps.length > 0 && value.roadmaps.every(isRoadmap)
+const isVersion = (value: unknown): value is RoadmapVersion =>
+  isRecord(value) && typeof value.id === 'string' && typeof value.label === 'string' && typeof value.createdAt === 'string' && isRoadmap(value.roadmap)
+
+export const isStoredRoadmaps = (value: unknown): value is { roadmaps: Roadmap[]; activeRoadmapId?: string; versions?: RoadmapVersion[] } =>
+  isRecord(value) && Array.isArray(value.roadmaps) && value.roadmaps.length > 0 && value.roadmaps.every(isRoadmap) &&
+  (value.versions === undefined || (Array.isArray(value.versions) && value.versions.every(isVersion)))

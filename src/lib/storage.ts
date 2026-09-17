@@ -2,7 +2,7 @@ import { del, get, set } from 'idb-keyval'
 
 export const STORAGE_KEY = 'roadmapbuilder-data'
 
-type StoredRoadmaps = { roadmaps: unknown[]; activeRoadmapId?: string }
+type StoredRoadmaps = { roadmaps: unknown[]; activeRoadmapId?: string; versions?: unknown[] }
 
 export async function loadRoadmapData(): Promise<StoredRoadmaps | null> {
   const indexed = await get<StoredRoadmaps>(STORAGE_KEY)

@@ -42,6 +42,7 @@ function App() {
 
   const hydrate = useRoadmapStore((state) => state.hydrate)
   const roadmaps = useRoadmapStore((state) => state.roadmaps)
+  const versions = useRoadmapStore((state) => state.versions)
   const activeRoadmap = useRoadmapStore((state) => getActiveRoadmap(state))
   const sidebarOpen = useRoadmapStore((state) => state.sidebarOpen)
   const saveState = useRoadmapStore((state) => state.saveState)
@@ -78,11 +79,11 @@ function App() {
     const version = ++saveVersion.current
     useRoadmapStore.setState({ saveState: 'saving' })
     const timer = window.setTimeout(() => {
-      saveRoadmapData({ roadmaps, activeRoadmapId: activeRoadmap?.id }).then(() => { if (version === saveVersion.current) useRoadmapStore.setState({ saveState: 'saved' }) }).catch(() => { if (version === saveVersion.current) useRoadmapStore.setState({ saveState: 'error' }) })
+            saveRoadmapData({ roadmaps, activeRoadmapId: activeRoadmap?.id, versions }).then(() => { if (version === saveVersion.current) useRoadmapStore.setState({ saveState: 'saved' }) }).catch(() => { if (version === saveVersion.current) useRoadmapStore.setState({ saveState: 'error' }) })
     }, 250)
     return () => window.clearTimeout(timer)
-  }, [hydrated, roadmaps, activeRoadmap?.id])
-
+  }, [hydrated, roadmaps, activeRoadmap?.id, versions])
+  
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
