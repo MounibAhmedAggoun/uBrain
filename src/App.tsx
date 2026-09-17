@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { ReactFlowProvider } from '@xyflow/react'
 import { Canvas } from './components/Canvas'
+import { ErrorBoundary } from './components/ErrorBoundary'
 const NotesPanel = lazy(() => import('./components/NotesPanel').then((module) => ({ default: module.NotesPanel })))
 const EdgePanel = lazy(() => import('./components/EdgePanel').then((module) => ({ default: module.EdgePanel })))
 const PlanningPanel = lazy(() => import('./components/PlanningPanel').then((module) => ({ default: module.PlanningPanel })))
@@ -154,7 +155,9 @@ function App() {
                   </div>
                 </div>
                 <ReactFlowProvider>
-                  <Canvas />
+                  <ErrorBoundary label="canvas">
+                    <Canvas />
+                  </ErrorBoundary>
                 </ReactFlowProvider>
                 <div className="canvas-tip"><span>Right-click</span> anywhere to add a milestone</div>
                 {typedEdgeCount > 0 && (
@@ -167,7 +170,9 @@ function App() {
                   </div>
                 )}
               </main>
-              <NotesPanel />
+              <ErrorBoundary label="notes panel">
+                <NotesPanel />
+              </ErrorBoundary>
               <PlanningPanel />
               <EdgePanel />
             </>
