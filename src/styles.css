@@ -1465,3 +1465,27 @@ body { background: var(--bg); }
   .workspace { height: calc(100vh - 68px); }
   .sidebar-slot.open { width: 270px; flex-basis: 270px; }
 }
+
+
+.conflict-banner {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 24px var(--shadow);
+  font-size: 13px;
+}
+
+.conflict-actions {
+  display: flex;
+  gap: 8px;
+}

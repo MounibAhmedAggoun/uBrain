@@ -18,7 +18,7 @@ export async function publishRoadmap(roadmap: Roadmap, slug: string) {
   const session = await supabase.auth.getSession()
   const ownerId = session.data.session?.user.id
   if (!ownerId) throw new Error('Sign in to publish a roadmap')
-  const saved = await supabase.from('roadmaps').upsert({ id: roadmap.id, owner_id: ownerId, name: roadmap.name, payload: roadmap }, { onConflict: 'id' })
+  const saved = await supabase.from('roadmaps').upsert({ id: roadmap.id, owner_id: ownerId, name: roadmap.name, payload: roadmap, updated_at: new Date().toISOString() }, { onConflict: 'id' })
   if (saved.error) throw saved.error
   const rows = await request<{ slug: string }[]>('/roadmap_shares?on_conflict=roadmap_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ roadmap_id: roadmap.id, slug, published_payload: roadmap }) })
   return rows[0]
@@ -59,7 +59,7 @@ export async function forkPublishedRoadmap(sourceId: string, roadmap: Roadmap) {
   const ownerId = session.data.session?.user.id
   if (!ownerId) throw new Error('Sign in to fork a roadmap')
   const forked = { ...roadmap, id: crypto.randomUUID(), name: `${roadmap.name} (fork)` }
-  const created = await supabase.from('roadmaps').insert({ id: forked.id, owner_id: ownerId, name: forked.name, payload: forked }).select('id').single()
+  const created = await supabase.from('roadmaps').insert({ id: forked.id, owner_id: ownerId, name: forked.name, payload: forked, updated_at: new Date().toISOString() }).select('id').single()
   if (created.error) throw created.error
   const relation = await supabase.from('roadmap_forks').insert({ source_roadmap_id: sourceId, forked_roadmap_id: forked.id })
   if (relation.error) throw relation.error
@@ -75,12 +75,21 @@ export async function saveCloudRoadmap(roadmap: Roadmap) {
   const session = await supabase.auth.getSession()
   const ownerId = session.data.session?.user.id
   if (!ownerId) throw new Error('Sign in to sync roadmaps')
-  const result = await supabase.from('roadmaps').upsert({ id: roadmap.id, owner_id: ownerId, name: roadmap.name, payload: roadmap }, { onConflict: 'id' })
+  const updatedAt = new Date().toISOString()
+  const result = await supabase.from('roadmaps').upsert({ id: roadmap.id, owner_id: ownerId, name: roadmap.name, payload: roadmap, updated_at: updatedAt }, { onConflict: 'id' })
   if (result.error) throw result.error
+  return updatedAt
 }
 
-export function subscribeToRoadmap(roadmapId: string, onChange: (roadmap: Roadmap) => void) {
+export async function loadCloudRoadmap(roadmapId: string) {
+  if (!supabase) throw new Error('Supabase is not configured')
+  const result = await supabase.from('roadmaps').select('payload, updated_at').eq('id', roadmapId).single()
+  if (result.error) throw result.error
+  return { roadmap: result.data.payload as Roadmap, updatedAt: result.data.updated_at as string }
+}
+
+export function subscribeToRoadmap(roadmapId: string, onChange: (roadmap: Roadmap, updatedAt: string) => void) {
   if (!supabase) return () => undefined
-  const channel = supabase.channel(`roadmap:${roadmapId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'roadmaps', filter: `id=eq.${roadmapId}` }, (payload) => { const roadmap = (payload.new as { payload?: Roadmap }).payload; if (roadmap) onChange(roadmap) }).subscribe()
+  const channel = supabase.channel(`roadmap:${roadmapId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'roadmaps', filter: `id=eq.${roadmapId}` }, (payload) => { const row = payload.new as { payload?: Roadmap; updated_at?: string }; if (row.payload && row.updated_at) onChange(row.payload, row.updated_at) }).subscribe()
   return () => { void supabase.removeChannel(channel) }
 }

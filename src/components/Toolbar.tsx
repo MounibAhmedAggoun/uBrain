@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, Columns3, Download, Ellipsis, GitCompare, History, Image, LayoutGrid, LogIn, Menu, Moon, Network, Plus, Redo2, Search, Sparkles, Sun, Undo2, Upload } from 'lucide-react'
+import { BarChart3, CalendarDays, Columns3, Download, Ellipsis, GitCompare, History, Image, LayoutGrid, LogIn, Menu, Moon, Network, Plus, RefreshCw, Redo2, Search, Sparkles, Sun, Undo2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import { useRoadmapStore, getActiveRoadmap, type Roadmap } from '../store/useRoadmapStore'
@@ -26,7 +26,9 @@ export function Toolbar({
   onOpenAi,
   onToggleDiffView,
   diffViewActive,
-}: {
+  cloudSyncOn,
+  onToggleCloudSync,
+  }: {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   onToggleGraphView: () => void
@@ -41,8 +43,10 @@ export function Toolbar({
   onOpenAuth: () => void
   onOpenHistory: () => void
   onOpenAi: () => void
-  onToggleDiffView: () => void
+    onToggleDiffView: () => void
   diffViewActive: boolean
+  cloudSyncOn: boolean
+  onToggleCloudSync: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -277,6 +281,11 @@ export function Toolbar({
               <button role="menuitem" onClick={publish}>
                 <Network size={15} /> Publish roadmap
               </button>
+              {cloudConfigured && (
+                <button role="menuitem" onClick={() => { closeMenu(); onToggleCloudSync() }}>
+                  <RefreshCw size={15} /> {cloudSyncOn ? 'Stop cloud sync' : 'Sync to cloud'}
+                </button>
+              )}
               <button role="menuitem" onClick={() => inputRef.current?.click()}>
                 <Upload size={15} /> Import
               </button>

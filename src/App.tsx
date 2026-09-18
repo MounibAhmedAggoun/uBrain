@@ -20,8 +20,9 @@ const OnboardingPanel = lazy(() => import('./components/OnboardingPanel').then((
 const AiRoadmapPanel = lazy(() => import('./components/AiRoadmapPanel').then((module) => ({ default: module.AiRoadmapPanel })))
 const VersionHistoryPanel = lazy(() => import('./components/VersionHistoryPanel').then((module) => ({ default: module.VersionHistoryPanel })))
 const DiffView = lazy(() => import('./components/views/DiffView').then((module) => ({ default: module.DiffView })))
-import { getActiveRoadmap, useRoadmapStore } from './store/useRoadmapStore'
+import { getActiveRoadmap, useRoadmapStore, type Roadmap } from './store/useRoadmapStore'
 import { saveRoadmapData } from './lib/storage'
+import { cloudConfigured, loadCloudRoadmap, saveCloudRoadmap, subscribeToRoadmap, supabase } from './lib/cloud'
 
 function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -40,6 +41,9 @@ function App() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [diffViewActive, setDiffViewActive] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [signedIn, setSignedIn] = useState(false)
+  const [cloudSyncOn, setCloudSyncOn] = useState(false)
+  const [conflict, setConflict] = useState<{ roadmap: Roadmap; updatedAt: string } | null>(null)
 
   const hydrate = useRoadmapStore((state) => state.hydrate)
   const roadmaps = useRoadmapStore((state) => state.roadmaps)
@@ -48,6 +52,7 @@ function App() {
   const sidebarOpen = useRoadmapStore((state) => state.sidebarOpen)
   const saveState = useRoadmapStore((state) => state.saveState)
   const goToLevel = useRoadmapStore((state) => state.goToLevel)
+  const importRoadmap = useRoadmapStore((state) => state.importRoadmap)
   const navigationNames = useRoadmapStore(useShallow((state) => {
     const root = state.roadmaps.find((item) => item.id === state.activeRoadmapId)
     const names = [root?.name ?? 'Roadmap']
@@ -63,6 +68,7 @@ function App() {
   const typedEdgeCount = activeRoadmap?.edges.filter((edge) => typeof (edge.data as { kind?: string } | undefined)?.kind === 'string').length ?? 0
   const [hydrated, setHydrated] = useState(false)
   const saveVersion = useRef(0)
+  const lastSyncedAt = useRef<string | null>(null)
 
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(null), 3200); return () => window.clearTimeout(timer) }, [toast])
 
@@ -76,6 +82,13 @@ function App() {
   }, [hydrate])
 
   useEffect(() => {
+    if (!supabase) return
+    supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)))
+    const listener = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)))
+    return () => listener.data.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
     if (!hydrated) return
     const version = ++saveVersion.current
     useRoadmapStore.setState({ saveState: 'saving' })
@@ -84,7 +97,47 @@ function App() {
     }, 250)
     return () => window.clearTimeout(timer)
   }, [hydrated, roadmaps, activeRoadmap?.id, versions])
-  
+
+  useEffect(() => {
+    if (!cloudSyncOn || !activeRoadmap) return
+    const timer = window.setTimeout(() => {
+      saveCloudRoadmap(activeRoadmap).then((updatedAt) => { lastSyncedAt.current = updatedAt }).catch(() => setToast('Cloud sync failed'))
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [cloudSyncOn, roadmaps, activeRoadmap?.id])
+
+  useEffect(() => {
+    if (!cloudSyncOn || !activeRoadmap) return
+    const unsubscribe = subscribeToRoadmap(activeRoadmap.id, (roadmap, updatedAt) => {
+      if (lastSyncedAt.current && updatedAt <= lastSyncedAt.current) return
+      setConflict({ roadmap, updatedAt })
+    })
+    return unsubscribe
+  }, [cloudSyncOn, activeRoadmap?.id])
+
+  const toggleCloudSync = async () => {
+    if (!cloudConfigured) { setToast('Add Supabase credentials to sync'); return }
+    if (!signedIn) { setToast('Sign in to sync roadmaps'); setAuthOpen(true); return }
+    if (cloudSyncOn) { setCloudSyncOn(false); return }
+    if (!activeRoadmap) return
+    try {
+      const existing = await loadCloudRoadmap(activeRoadmap.id)
+      lastSyncedAt.current = null
+      setConflict({ roadmap: existing.roadmap, updatedAt: existing.updatedAt })
+    } catch {
+      lastSyncedAt.current = null
+    }
+    setCloudSyncOn(true)
+  }
+
+  const resolveConflict = (useIncoming: boolean) => {
+    if (useIncoming && conflict) {
+      importRoadmap(conflict.roadmap)
+      lastSyncedAt.current = conflict.updatedAt
+    }
+    setConflict(null)
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
@@ -117,6 +170,8 @@ function App() {
           onOpenHistory={() => setHistoryOpen(true)}
           onToggleDiffView={() => setDiffViewActive(!diffViewActive)}
           diffViewActive={diffViewActive}
+          cloudSyncOn={cloudSyncOn}
+          onToggleCloudSync={toggleCloudSync}
         />
         <div className="workspace">
           {diffViewActive ? (
@@ -179,6 +234,15 @@ function App() {
           )}
         </div>
       </div>
+      {conflict && (
+        <div className="conflict-banner" role="alert">
+          <span>This roadmap was updated elsewhere.</span>
+          <div className="conflict-actions">
+            <button className="button primary" onClick={() => resolveConflict(true)}>Reload latest</button>
+            <button className="button secondary" onClick={() => resolveConflict(false)}>Keep mine</button>
+          </div>
+        </div>
+      )}
       <Dashboard />
       <CommandPalette open={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
       {authOpen && <AuthPanel onClose={() => setAuthOpen(false)} onNotify={setToast} />}
@@ -192,4 +256,3 @@ function App() {
 }
 
 export default App
-
